@@ -70,11 +70,8 @@ class SubroutineBody(object):
 class ParameterList(object):
   @staticmethod
   def is_mytype(self, tokenizer):
-    tok = tokenizer.tok_ahead()
-    if type(tok) is Terminator and tok.type == "identifier":
-      return True
-    return False
-  
+    return True
+ 
   def __init__(self):
     self.params_list = []
   
