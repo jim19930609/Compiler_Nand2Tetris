@@ -217,3 +217,5 @@ class Statements(object):
         statement = Statement()
         statement.parse(tokenizer)
         self.statements.append(statement)
+      else:
+        break
