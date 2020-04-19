@@ -13,7 +13,12 @@ class Terminator(object):
     
   def is_identifier(self):
     return self.type == "identifier"
-    
+
+  def __repr__(self):
+    return f"{self.val}(\"{self.type}\")"    
+  
+  def __str__(self):
+    return f"{self.val}(\"{self.type}\")"    
 
 # Tokenizer:
 # 1. original file content
@@ -25,8 +30,7 @@ class Tokenizer(object):
     self.content = ""
     self.cursor  = 0
 
-  @staticmethod
-  def is_tok_keywork(self, tok):
+  def is_tok_keyword(self, tok):
     if tok in ["class", "constructor", "function", "method", 
                "field", "static", "var", "int", "char", "boolean", 
                "void", "true", "false", "null", "this", "let", "do", 
@@ -34,19 +38,16 @@ class Tokenizer(object):
       return True
     return False
   
-  @staticmethod
   def is_tok_symbol(self, tok):
     if tok in ["{", "}", "(", ")", "[", "]", ".", ",", ";", "+", "-", "*", "/", "&", "|", "<", ">", "=", "~"]:
       return True
     return False
     
-  @staticmethod
   def is_tok_string(self, tok):
     if tok[0] == "\"" and tok[-1] == "\"":
       return True
     return False
 
-  @staticmethod
   def is_tok_integer(self, tok):
     try:
       int(tok)
@@ -54,10 +55,9 @@ class Tokenizer(object):
     except ValueError:
       return False
     
-  @staticmethod
   def is_tok_identifier(self, tok):
       # Is identifier
-      legal_identifier_letters = [v for v in "abcdefghijklmnopqrstuvwxyz_0123456789"]
+      legal_identifier_letters = [v for v in "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz_0123456789"]
       ilegal_start_letter = [v for v in "0123456789"]
       if tok[0] in ilegal_start_letter:
         return False
@@ -68,36 +68,84 @@ class Tokenizer(object):
 
   def remove_space(self, cursor):
     cursor_tmp = copy.copy(cursor)
-    while self.content[cursor_tmp] == " ":
+    if cursor_tmp >= len(self.content):
+      print("Finished parsing file")
+      return cursor_tmp
+    
+    while self.content[cursor_tmp] in [" ", "\n", "/"]:
+      if self.content[cursor_tmp] == "/" and self.content[cursor_tmp+1] == "/":
+        cursor_tmp = self.erase_comments_short(cursor_tmp)
+        continue
+      if self.content[cursor_tmp] == "/" and self.content[cursor_tmp+1] == "*":
+        cursor_tmp = self.erase_comments_long(cursor_tmp)
+        continue
+      
       cursor_tmp += 1
+      if cursor_tmp >= len(self.content):
+        print("Finished parsing file")
+        return cursor_tmp
     return cursor_tmp
+
+  def erase_comments_short(self, cursor):
+    assert self.content[cursor] == "/" and self.content[cursor+1] == "/"
+    while self.content[cursor] != "\n":
+      cursor += 1
+    
+    # Skip "\n"
+    cursor += 1
+    return cursor
+
+  def erase_comments_long(self, cursor):
+    assert self.content[cursor] == "/" and self.content[cursor+1] == "*"
+    while True:
+      if self.content[cursor] == "*" and self.content[cursor+1] == "/":
+        cursor += 2
+        break
+      cursor += 1
+    
+    return cursor
 
   ## Read methods ##
   #  tok_ahead: do not consume
   #  tok_consume
-  def get_tok(self):
+  def get_tok(self, extern_cursor):
     # current cursor to next space
     # do not update cursor
     # determine and return tok
-    assert not file_ends()
+    assert extern_cursor < len(self.content)
     tok = ""
-    cursor = self.remove_space(self.cursor)
+    cursor = self.remove_space(extern_cursor)
     content = self.content
+    
+    char = content[cursor]
+    is_string = char == "\""
+    if is_string:
+      tok += char
+      cursor += 1
+
     while True:
       char = content[cursor]
-      if char == " ":
+      if is_string:
+        if char == "\"":
+          tok += char
+          cursor += 1
+          break
+      elif char in [" ", "\n"]:
         break
-      
-      if is_tok_symbol(char):
+      elif self.is_tok_symbol(char):
         if len(tok) == 0:
           tok = char
           cursor += 1
+        break
+      elif char == "/" and content[cursor+1] == "/":
+        break
+      elif char == "/" and content[cursor+1] == "*":
         break
       
       tok += char
       cursor += 1
     
-    cursor = self.remove_space(self.cursor)
+    cursor = self.remove_space(cursor)
     
     ret = None
     if self.is_tok_keyword(tok):
@@ -115,13 +163,19 @@ class Tokenizer(object):
 
     return ret, cursor
 
+  def tok_ahead_next(self):
+    tok, cursor = self.get_tok(self.cursor)
+    tok, cursor = self.get_tok(cursor)
+    
+    return tok
+    
   ##### User Interface ##### 
   def tok_ahead(self):
-    tok, cursor = self.get_tok()
+    tok, cursor = self.get_tok(self.cursor)
     return tok
     
   def tok_advance(self):
-    tok, cursor = self.get_tok()
+    tok, cursor = self.get_tok(self.cursor)
     self.cursor = cursor
     return tok
 
@@ -135,6 +189,7 @@ class Tokenizer(object):
       self.content = f.read()
     
     assert len(self.content) > 0
+    print(self.content)
 
 
 if __name__ == "__main__":
