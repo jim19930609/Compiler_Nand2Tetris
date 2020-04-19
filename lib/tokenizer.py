@@ -72,13 +72,16 @@ class Tokenizer(object):
       print("Finished parsing file")
       return cursor_tmp
     
-    while self.content[cursor_tmp] in [" ", "\n", "/"]:
+    while True:
       if self.content[cursor_tmp] == "/" and self.content[cursor_tmp+1] == "/":
         cursor_tmp = self.erase_comments_short(cursor_tmp)
         continue
       if self.content[cursor_tmp] == "/" and self.content[cursor_tmp+1] == "*":
         cursor_tmp = self.erase_comments_long(cursor_tmp)
         continue
+
+      if self.content[cursor_tmp] not in [" ", "\n"]:
+        break
       
       cursor_tmp += 1
       if cursor_tmp >= len(self.content):
@@ -160,7 +163,7 @@ class Tokenizer(object):
       ret = Terminator(tok, "identifier")
     else:
       assert False
-
+    
     return ret, cursor
 
   def tok_ahead_next(self):

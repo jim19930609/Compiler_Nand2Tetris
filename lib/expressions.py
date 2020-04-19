@@ -128,7 +128,7 @@ class Term(object):
       assert Expression.is_mytype(tokenizer)
       expression = Expression()
       expression.parse(tokenizer)
-      self.expression = expresssion
+      self.expression = expression
       assert tokenizer.tok_advance() == ")"
     elif tok in UnaryOps: 
       print("[Parsing UnaryOps")

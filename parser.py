@@ -24,7 +24,17 @@ class Parser(object):
     return c
 
 if __name__ == "__main__":
-  parser = Parser(["nand2tetris/projects/10/ExpressionLessSquare/Main.jack"])
+  # Task 1
+  #parser = Parser(["nand2tetris/projects/10/ArrayTest/Main.jack"])
+  
+  # Task 2
+  #parser = Parser(["nand2tetris/projects/10/ExpressionLessSquare/Main.jack"])
   #parser = Parser(["nand2tetris/projects/10/ExpressionLessSquare/Square.jack"])
   #parser = Parser(["nand2tetris/projects/10/ExpressionLessSquare/SquareGame.jack"])
+  
+  # Task 3
+  #parser = Parser(["nand2tetris/projects/10/Square/Main.jack"])
+  #parser = Parser(["nand2tetris/projects/10/Square/Square.jack"])
+  parser = Parser(["nand2tetris/projects/10/Square/SquareGame.jack"])
+  
   parser.parse_program()

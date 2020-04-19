@@ -105,7 +105,7 @@ class ParameterList(object):
       assert type(name) is Terminator
       assert name.type == "identifier"
       
-      self.params_list.append(tuple(datatype, name))
+      self.params_list.append([datatype, name])
 
       if tokenizer.tok_ahead() == ",":
         tokenizer.tok_advance()
