@@ -1,4 +1,5 @@
 from lib.tokenizer import Terminator
+from lib.helper import variable_lookup
 
 Ops = ["+", "-", "*", "/", "&", "|", "<", ">", "="]
 UnaryOps = ["-", "~"]
@@ -11,7 +12,7 @@ class ExpressionList(object):
     
   def __init__(self):
     self.expressions = []
-  
+
   def parse(self, tokenizer):
     print("----- Expression List Start -----")
     while True:
@@ -27,8 +28,16 @@ class ExpressionList(object):
         else:
           break
     print("----- Expression List End -----")
-
-
+  
+  def codegen(self, symtab_l, symtab_c):
+    # Push arguments to stack
+    # Already handled by expression.codegen()
+    code = []
+    for expression in self.espressions:
+      code += expression.codegen(symtab_l, symtab_c)
+    
+    return code
+    
 class SubroutineCall(object):
   @staticmethod
   def is_mytype(tokenizer):
@@ -73,7 +82,22 @@ class SubroutineCall(object):
       self.expression_list_l = expression_list
       assert tokenizer.tok_advance() == ")"
     print("----- Subroutine Call End -----")
+
+  def codegen(self, symtab_l, symtab_c):
+    # subroutineName(expressionlist): function
+    # 
+    # className|varName.subroutineName(expressionlist): method
+    code = []
+    num_arguments = 0
+    if self.class_or_var_name:
+      var_info = variable_lookup(self.class_or_var_name, symtab_l, symtab_c)
+      code += ["push {var_info[\"kind\"]} {var_info[\"index\"]}"]
+      num_arguments += 1
+      
+    num_arguments += len(self.expression_list.expressions)
+    code += [f"call {self.subroutine_name} {num_arguments}"]
     
+    return code
 
 class Term(object):
   @staticmethod
@@ -138,7 +162,65 @@ class Term(object):
       term.parse(tokenizer)
       self.term = term
     print("----- Term End -----")
-
+    
+  def codegen(symtab_l, symtab_c):
+    code = []
+    # Case: subroutineCall
+    if self.subroutine_call:
+      code += self.subroutine_call.codegen(symtab_l, symtab_c)
+      return code
+    # Case: varName[expression]
+    if self.const_or_op and self.expression:
+      # Parse Array Indexing
+      var_info = variable_lookup(self.const_or_op, symtab_l, symtab_c)
+      # varName + codegen(expression) -> offset
+      code += ["push {var_info[\"kind\"]} {var_info[\"index\"]}"]
+      code += self.espression.codegen(symtab_l, symtab_c)
+      # Set that pointer
+      code += ["pop pointer 1"]
+      code += ["push that 0"]
+    return code
+    # Case: (expression)
+    if self.expression and self.const_or_op is None:
+      code += self.expression.codegen(symtab_l, symtab_c)
+      return code
+    # Case: UnaryOp term
+    if self.term and self.const_or_op:
+      # 1. parse term
+      code += self.term.codegen(symtab_l, symtab_c)
+      # 2. parse unaryOp
+      if self.const_or_op == "-":
+        code += ["neg"]
+      elif self.const_or_op == "~":
+        code += ["not"]
+      else:
+        raise "Unrecognized unaryOp during code gen for term"
+      return code
+    # Case: integerConstant, stringConstant, keywordConstant, varName
+    if self.const_or_op and self.term is None and self.expression is None and self.term is None:
+      if type(self.const_or_op) is Terminator and self.const_or_op.type == "identifier":
+        # Case: varName
+        var_info = variable_lookup(self.const_or_op, symtab_l, symtab_c)
+        code += ["push {var_info[\"kind\"]} {var_info[\"index\"]}"]
+        return code
+      else:
+        # Case: Constants
+        if self.const_or_op == "true":
+          # map to -1
+          code += ["push 1"]
+          code += ["neg"]
+        elif self.const_or_op == "false":
+          # map to 0
+          code += ["push 0"]
+        elif self.const_or_op == "null":
+          # map to 0
+          code += ["push 0"]
+        elif self.const_or_op == "this":
+          code += ["push this 0"]
+        else:
+          # Int/Str Constants
+          code += [f"push {self.const_or_op}"]
+        return code
 
 class Expression(object):
   @staticmethod
@@ -171,4 +253,39 @@ class Expression(object):
       self.terms.append(term)
     
     print("----- Expression End -----")
+  
+  def codegen(self, symtab_l, symtab_c):
+    code = []
+    # push first term
+    code += self.terms[0].codegen(symtab_l, symtab_c)
     
+    # from second term on,
+    for i in range(1, len(self.terms)):
+      # 1. push term
+      term = self.terms[i]
+      code += term.codegen(symtab_l, symtab_c)
+      
+      # 2. push op
+      op = self.ops[i]
+      if op == "+":
+        code += ["add"]
+      elif op == "-":
+        code += ["sub"]
+      elif op == "*":
+        code += ["mul"]
+      elif op == "/":
+        code += ["div"]
+      elif op == "&":
+        code += ["and"]
+      elif op == "|":
+        code += ["or"]
+      elif op == "<":
+        code += ["lt"]
+      elif op == ">":
+        code += ["gt"]
+      elif op == "=":
+        code += ["eq"]
+      else:
+        raise "Unrecognized op during codegen for term"
+      
+    return code
