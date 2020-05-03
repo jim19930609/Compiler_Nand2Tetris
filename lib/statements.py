@@ -1,4 +1,5 @@
 from lib.tokenizer import Terminator
+from lib.helper import variable_lookup
 from lib.expressions import *
 
 class LetStatement(object):
@@ -50,7 +51,30 @@ class LetStatement(object):
     
     print("----- Let Statement End -----")
     
-
+  def codegen(self, symtab_l, symtab_c, label_tracer):
+    code = []
+    if self.expression_l:
+      # let varName[expression_l] = expression_r
+      # Handle Array
+      var_info = variable_lookup(self.varName, symtab_l, symtab_c)
+      code += ["push {var_info[\"kind\"]} {var_info[\"index\"]}"]
+      code += self.espression_l.codegen(symtab_l, symtab_c)
+      code += ["add"]
+      code += ["pop pointer 1"]
+      # Now that points to varName[expression_l]
+      code += self.expression_r.codegen(symtab_l, symtab_c)
+      # set expression_r to that 0
+      code += ["pop that 0"]
+      
+    else:
+      # let varName = expression_r
+      code += self.expression_r.codegen(symtab_l, symtab_c)
+      # set expression_r to varName
+      var_info = variable_lookup(self.varName, symtab_l, symtab_c)
+      code += ["pop {var_info[\"kind\"]} {var_info[\"index\"]}"]
+      
+    return code
+    
 class IfStatement(object):
   @staticmethod
   def is_mytype(tokenizer):
@@ -101,6 +125,22 @@ class IfStatement(object):
     
     print("----- If Statement End -----")
       
+  def codegen(self, symtab_l, symtab_c, label_tracer):
+    label_1 = label_tracer.get_label()
+    label_2 = label_tracer.get_label()
+    label_3 = label_tracer.get_label()
+    code = []
+    code += [f"(Label {label_1})"]
+    code += self.expression.codegen(symtab_l, symtab_c)
+    code += ["not"]
+    code += [f"if-goto {label_2}"]
+    code += self.if_statements.codegen(symtab_l, symtab_c, label_tracer)
+    code += [f"goto {label_3}"]
+    code += [f"(Label {label_2})"]
+    code += self.else_statements.codegen(symtab_l, symtab_c, label_tracer)
+    code += [f"(Label {label_3})"]
+    
+
 
 class WhileStatement(object):
   @staticmethod
@@ -137,8 +177,19 @@ class WhileStatement(object):
     assert tokenizer.tok_advance() == "}"
     
     print("----- While Statement End -----")
-
-
+ 
+  def codegen(self, symtab_l, symtab_c, label_tracer):
+    label_1 = label_tracer.get_label()
+    label_2 = label_tracer.get_label()
+    code = []
+    code += [f"(Label {label_1})"]
+    code += self.expression.codegen(symtab_l, symtab_c)
+    code += ["not"]
+    code += [f"if-goto {label_2}"]
+    code += self.statements.codegen(symtab_l, symtab_c, label_tracer)
+    code += [f"goto {label_1}"]
+    code += [f"(Label {label_2})"]
+     
 class DoStatement(object):
   @staticmethod
   def is_mytype(tokenizer):
@@ -160,7 +211,10 @@ class DoStatement(object):
     self.subroutine_call = sub_call
     assert tokenizer.tok_advance() == ";"
     print("----- Do Statement End -----")
-
+  
+  def codegen(self, symtab_l, symtab_c, label_tracer):
+    code = self.subroutine_call.codegen(symtab_l, symtab_c)
+    return code
 
 class ReturnStatement(object):
   @staticmethod
@@ -186,7 +240,11 @@ class ReturnStatement(object):
     
     assert tokenizer.tok_advance() == ";"
     print("----- Return Statement End -----")
-
+  
+  def codegen(self, symtab_l, symtab_c, label_tracer):
+    code = self.expression.codegen(symtab_l, symtab_c)
+    code += ["return"]
+    return code
 
 class Statement(object):
   @staticmethod
@@ -232,8 +290,10 @@ class Statement(object):
       statement = ReturnStatement()
       statement.parse(tokenizer)
       self.statement = statement
+  
+  def codegen(self, symtab_l, symtab_c, label_tracer):
+    return self.statement.codegen(symtab_l, symtab_c, label_tracer)
     
-
 class Statements(object):
   @staticmethod
   def is_mytype(tokenizer):
@@ -250,3 +310,9 @@ class Statements(object):
         self.statements.append(statement)
       else:
         break
+  
+  def codegen(self, symtab_l, symtab_c, label_tracer):
+    code = []
+    for statement in self.statements:
+      code += statement.codegen(symtab_l, symtab_c, label_tracer)
+    return code
