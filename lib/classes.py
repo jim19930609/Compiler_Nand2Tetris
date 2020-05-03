@@ -42,6 +42,15 @@ class VarDec(object):
     
     print("----- VarDec End -----")  
       
+  def codegen(self, symtab_l):
+    local_index = 0
+    for name in self.names:
+      symtab_l[name] = {}
+      symtab_l[name]["kind"] = "local"
+      stmtab_l[name]["type"] = self.type
+      symtab_l[name]["index"] = local_index
+      local_index += 1
+    return symtab_l
 
 class SubroutineBody(object):
   @staticmethod
@@ -80,6 +89,13 @@ class SubroutineBody(object):
     print(symbol_r)
     print("------ SubroutineBody End ------")
 
+  def codegen(self, symtab_l, symtab_c, global_tracer):
+    code = []
+    label_tracer = global_tracer.label_tracer
+    for var_dec in self.var_decs:
+      symtab_l = var_dec.codegen(symtab_l)
+    code += self.statements.codegen(symtab_l, symtab_c, label_tracer)
+    return code
 
 class ParameterList(object):
   @staticmethod
@@ -114,6 +130,16 @@ class ParameterList(object):
       print("[Parsing Parameter End]")
     print("------ ParameterList End ------")
 
+  def codegen(self, symtab_l):
+    argument_index = 0
+    for param in self.params_list:
+      dtype, name = param
+      symtab_l[name] = {}
+      symtab_l[name]["kind"] = "argument"
+      symtab_l[name]["type"] = dtype
+      symtab_l[name]["index"] = argument_index
+      argument_index += 1
+    return symtab_l
 
 class SubroutineDec(object):
   @staticmethod
@@ -216,7 +242,25 @@ class ClassVarDec(object):
       self.names.append(name)
 
     print("------ ClassVarDec End ------")
-
+  
+  def codegen(self, symtab_c, global_tracer, class_name):
+    # Update symtab_c
+    field_index = 0
+    for name in self.names:
+      symtab_c[name] = {}
+      if self.decorator == "static":
+        static_index = global_tracer.get_static_index()
+        symtab_c[name]["kind"] = "static"
+        symtab_c[name]["type"] = self.type
+        symtab_c[name]["index"] = static_index
+      elif self.decorator == "field":
+        symtab_c[name]["kind"] = "this"
+        symtab_c[name]["type"] = "class_name"
+        symtab_c[name]["index"] = field_index
+        field_index += 1
+      else:
+        raise "Unrecognized decorator during code gen for classVarDec"
+      return symtab_c
 
 class Class(object):
   @staticmethod

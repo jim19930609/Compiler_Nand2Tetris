@@ -176,6 +176,7 @@ class Term(object):
       # varName + codegen(expression) -> offset
       code += ["push {var_info[\"kind\"]} {var_info[\"index\"]}"]
       code += self.espression.codegen(symtab_l, symtab_c)
+      code += ["add"]
       # Set that pointer
       code += ["pop pointer 1"]
       code += ["push that 0"]
