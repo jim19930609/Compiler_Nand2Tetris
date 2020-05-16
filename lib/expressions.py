@@ -90,11 +90,14 @@ class SubroutineCall(object):
     code = []
     num_arguments = 0
     if self.class_or_var_name:
+      # push class instance pointer as first argument
       var_info = variable_lookup(self.class_or_var_name, symtab_l, symtab_c)
       code += ["push {var_info[\"kind\"]} {var_info[\"index\"]}"]
       num_arguments += 1
-      
-    num_arguments += len(self.expression_list.expressions)
+    
+    # push arguments and then call function
+    code += self.expression_list.code_gen()
+    num_arguments += len(self.expression_list(symtab_l, symtab_c))
     code += [f"call {self.subroutine_name} {num_arguments}"]
     
     return code

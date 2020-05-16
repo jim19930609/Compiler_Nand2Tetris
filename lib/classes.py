@@ -130,8 +130,9 @@ class ParameterList(object):
       print("[Parsing Parameter End]")
     print("------ ParameterList End ------")
 
-  def codegen(self, symtab_l):
+  def codegen(self):
     argument_index = 0
+    symtab_l = {}
     for param in self.params_list:
       dtype, name = param
       symtab_l[name] = {}
@@ -198,7 +199,36 @@ class SubroutineDec(object):
     self.subroutine_body = subroutine_body
     
     print("------ SubroutineDec End ------")
+  
+  def codegen(self, class_name, symbol_c, global_tracer):
+    # Init local symtab
+    # var_name : {"kind", "index"}
+    symtab_l = self.expression_list.code_gen()
 
+    if self.decorator == "constructor":
+      # Number of local variables
+      num_local_var = len(self.subroutine_body.var_decs)
+      num_arg_var   = len(symbol_c.keys())
+      
+      # Memory Alloc
+      code = [f"function {class_name}.{self.name} {num_local_var}"]
+      code += [f"push {num_arg_var}", "call Memory.alloc 1", "pop pointer 0"]
+      code += self.subroutine_body.code_gen(symtab_l, symtab_c, global_tracer)
+      
+    elif self.decorator == "method":
+      num_local_var = len(self.subroutine_body.var_decs)
+      
+      code = [f"function {class_name}.{self.name} {num_local_var}"]
+      code += self.subroutine_body.code_gen(symtab_l, symtab_c, global_tracer)
+    
+    elif self.decorator == "function":
+      num_local_var = len(self.subroutine_body.var_decs)
+      
+      code = [f"function {self.name} {num_local_var}"]
+      code += self.subroutine_body.code_gen(symtab_l, symtab_c, global_tracer)
+    
+    return code
+    
 class ClassVarDec(object):
   @staticmethod
   def is_mytype(tokenizer):
@@ -306,4 +336,14 @@ class Class(object):
     
     print(symbol_r)
     print("------ Class End ------")
-
+  
+  def codegen(self):
+    code = []
+    symtab_c = {}
+    for classVarDec in self.classVarDec:
+      symtab_c = classVarDec.codegen(symtab_c, global_tracer, self.name)
+    
+    for subroutineDec in self.subroutineDec:
+      code += subroutineDec.codegen(self.name, symtab_c, global_tracer)
+    
+    return code
