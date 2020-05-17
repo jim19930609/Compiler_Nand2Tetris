@@ -30,3 +30,6 @@ if __name__ == "__main__":
 
   class0 = parser.classes[0]
   code = class0.codegen()
+
+  for c in code:
+    print(c)

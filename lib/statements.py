@@ -53,11 +53,15 @@ class LetStatement(object):
     
   def codegen(self, symtab_l, symtab_c, global_tracer):
     code = []
+    self.varname = self.varname.val
     if self.expression_l:
       # let varName[expression_l] = expression_r
       # Handle Array
       var_info = variable_lookup(self.varname, symtab_l, symtab_c)
-      code += ["push {var_info[\"kind\"]} {var_info[\"index\"]}"]
+      kind = var_info["kind"]
+      index = var_info["index"]
+      
+      code += [f"push {kind} {index}"]
       code += self.espression_l.codegen(symtab_l, symtab_c)
       code += ["add"]
       code += ["pop pointer 1"]
@@ -71,7 +75,9 @@ class LetStatement(object):
       code += self.expression_r.codegen(symtab_l, symtab_c, global_tracer)
       # set expression_r to varName
       var_info = variable_lookup(self.varname, symtab_l, symtab_c)
-      code += ["pop {var_info[\"kind\"]} {var_info[\"index\"]}"]
+      kind = var_info["kind"]
+      index = var_info["index"]
+      code += [f"pop {kind} {index}"]
       
     return code
     

@@ -60,8 +60,8 @@ class VarDec(object):
       
   def codegen(self, symtab_l):
     local_index = 0
+    self.names = [v.val for v in self.names]
     for name in self.names:
-      name = name.val
       symtab_l[name] = {}
       symtab_l[name]["kind"] = "local"
       symtab_l[name]["type"] = self.type
@@ -150,6 +150,8 @@ class ParameterList(object):
     argument_index = 0
     symtab_l = {}
     
+    # [[type, name], ...]
+    self.params_list = [[l[0], l[1].val] for v in self.params_list]
     for param in self.params_list:
       dtype, name = param
       name = name.val
@@ -227,8 +229,12 @@ class SubroutineDec(object):
     # Init local symtab
     # var_name : {"kind", "index"}
     symtab_l = self.params_list.codegen()
+    
+    self.name = self.name.val
+    num_local_var = 0
+    for var_dec in self.subroutine_body.var_decs:
+      num_local_var += len(var_dec.names)
 
-    num_local_var = len(self.subroutine_body.var_decs)
     code = [f"function {class_name}.{self.name} {num_local_var}"]
     if self.decorator == "constructor":
       # Number of local variables
@@ -300,9 +306,9 @@ class ClassVarDec(object):
     class_types = global_tracer.compiled_types.class_types
     plain_types = global_tracer.compiled_types.plain_types
     assert self.type in class_types + plain_types
-
+    
+    self.names = [v.val for v in self.names]
     for name in self.names:
-      name = name.val
       symtab_c[name] = {}
       if self.decorator == "static":
         static_index = global_tracer.get_static_index()
@@ -367,6 +373,7 @@ class Class(object):
   def codegen(self):
     code = []
     symtab_c = {}
+    self.name = self.name.val
     for classVarDec in self.classVarDec:
       symtab_c = classVarDec.codegen(symtab_c, self.global_tracer, self.name)
     

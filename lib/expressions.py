@@ -89,24 +89,39 @@ class SubroutineCall(object):
     # className|varName.subroutineName(expressionlist): method
     code = []
     num_arguments = 0
+    self.subroutine_name = self.subroutine_name.val
     if self.class_or_var_name:
+      # Case: className|varName.subroutineName(expressionlist)
+      self.class_or_var_name = self.class_or_var_name.val
+
       # push class instance pointer as first argument
       class_types = global_tracer.compiled_types.class_types
-      if self.class_or_var_name.val in class_types:
+      if self.class_or_var_name in class_types:
         # function/constructor subroutine
         # No need to push object reference
         pass
       else:
         # method subroutine
         var_info = variable_lookup(self.class_or_var_name, symtab_l, symtab_c)
-        code += ["push {var_info[\"kind\"]} {var_info[\"index\"]}"]
+        kind = var_info["kind"]
+        index = var_info["index"]
+
+        code += [f"push {kind} {index}"]
         num_arguments += 1
     
-    # push arguments and then call function
-    if self.expression_list:
-      code += self.expression_list.codegen(symtab_l, symtab_c, global_tracer)
-      num_arguments += len(self.expression_list.expressions)
-    code += [f"call {self.subroutine_name} {num_arguments}"]
+      # push arguments and then call function
+      if self.expression_list:
+        code += self.expression_list.codegen(symtab_l, symtab_c, global_tracer)
+        num_arguments += len(self.expression_list.expressions)
+      
+      code += [f"call {self.class_or_var_name}.{self.subroutine_name} {num_arguments}"]
+    else:
+      # Case: subroutineName(expressionlist): function
+      if self.expression_list:
+        code += self.expression_list.codegen(symtab_l, symtab_c, global_tracer)
+        num_arguments += len(self.expression_list.expressions)
+      
+      code += [f"call {self.subroutine_name} {num_arguments}"]
     
     return code
 
@@ -182,10 +197,13 @@ class Term(object):
       return code
     # Case: varName[expression]
     if self.const_or_op and self.expression:
+      self.const_or_op = self.const_or_op.val
       # Parse Array Indexing
       var_info = variable_lookup(self.const_or_op, symtab_l, symtab_c)
+      kind = var_info["kind"]
+      index = var_info["index"]
       # varName + codegen(expression) -> offset
-      code += ["push {var_info[\"kind\"]} {var_info[\"index\"]}"]
+      code += [f"push {kind} {index}"]
       code += self.expression.codegen(symtab_l, symtab_c, global_tracer)
       code += ["add"]
       # Set that pointer
@@ -213,7 +231,10 @@ class Term(object):
       if type(self.const_or_op) is Terminator and self.const_or_op.type == "identifier":
         # Case: varName
         var_info = variable_lookup(self.const_or_op, symtab_l, symtab_c)
-        code += ["push {var_info[\"kind\"]} {var_info[\"index\"]}"]
+        kind = var_info["kind"]
+        index = var_info["index"]
+        
+        code += [f"push {kind} {index}"]
         return code
       else:
         # Case: Constants
