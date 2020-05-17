@@ -2,7 +2,8 @@ from lib.tokenizer import Tokenizer
 from lib.classes import Class
 
 class AllTypes(object):
-  types = set(["int", "char", "boolean"])
+  plain_types = ["int", "char", "boolean"]
+  class_types = ["Math", "String", "Memory", "Keyboard", "Output"]
 
 class Parser(object):
   def __init__(self, filenames):
@@ -17,24 +18,15 @@ class Parser(object):
 
   def parse_class(self):
     assert Class.is_mytype(self.tokenizer)
-    c = Class()
+    c = Class(AllTypes)
     c.parse(self.tokenizer)
-    AllTypes.types.add(c.name)
+    AllTypes.class_types.append(c.name.val)
 
     return c
 
 if __name__ == "__main__":
-  # Task 1
-  #parser = Parser(["nand2tetris/projects/10/ArrayTest/Main.jack"])
-  
-  # Task 2
-  #parser = Parser(["nand2tetris/projects/10/ExpressionLessSquare/Main.jack"])
-  #parser = Parser(["nand2tetris/projects/10/ExpressionLessSquare/Square.jack"])
-  #parser = Parser(["nand2tetris/projects/10/ExpressionLessSquare/SquareGame.jack"])
-  
-  # Task 3
-  #parser = Parser(["nand2tetris/projects/10/Square/Main.jack"])
-  #parser = Parser(["nand2tetris/projects/10/Square/Square.jack"])
-  parser = Parser(["nand2tetris/projects/10/Square/SquareGame.jack"])
-  
+  parser = Parser(["/Users/zhanlueyang/Desktop/Compiler_Nand2Tetris/nand2tetris/projects/11/Average/Main.jack"])
   parser.parse_program()
+
+  class0 = parser.classes[0]
+  code = class0.codegen()

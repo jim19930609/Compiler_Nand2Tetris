@@ -29,12 +29,12 @@ class ExpressionList(object):
           break
     print("----- Expression List End -----")
   
-  def codegen(self, symtab_l, symtab_c):
+  def codegen(self, symtab_l, symtab_c, global_tracer):
     # Push arguments to stack
     # Already handled by expression.codegen()
     code = []
-    for expression in self.espressions:
-      code += expression.codegen(symtab_l, symtab_c)
+    for expression in self.expressions:
+      code += expression.codegen(symtab_l, symtab_c, global_tracer)
     
     return code
     
@@ -83,7 +83,7 @@ class SubroutineCall(object):
       assert tokenizer.tok_advance() == ")"
     print("----- Subroutine Call End -----")
 
-  def codegen(self, symtab_l, symtab_c):
+  def codegen(self, symtab_l, symtab_c, global_tracer):
     # subroutineName(expressionlist): function
     # 
     # className|varName.subroutineName(expressionlist): method
@@ -91,13 +91,21 @@ class SubroutineCall(object):
     num_arguments = 0
     if self.class_or_var_name:
       # push class instance pointer as first argument
-      var_info = variable_lookup(self.class_or_var_name, symtab_l, symtab_c)
-      code += ["push {var_info[\"kind\"]} {var_info[\"index\"]}"]
-      num_arguments += 1
+      class_types = global_tracer.compiled_types.class_types
+      if self.class_or_var_name.val in class_types:
+        # function/constructor subroutine
+        # No need to push object reference
+        pass
+      else:
+        # method subroutine
+        var_info = variable_lookup(self.class_or_var_name, symtab_l, symtab_c)
+        code += ["push {var_info[\"kind\"]} {var_info[\"index\"]}"]
+        num_arguments += 1
     
     # push arguments and then call function
-    code += self.expression_list.code_gen()
-    num_arguments += len(self.expression_list(symtab_l, symtab_c))
+    if self.expression_list:
+      code += self.expression_list.codegen(symtab_l, symtab_c, global_tracer)
+      num_arguments += len(self.expression_list.expressions)
     code += [f"call {self.subroutine_name} {num_arguments}"]
     
     return code
@@ -166,11 +174,11 @@ class Term(object):
       self.term = term
     print("----- Term End -----")
     
-  def codegen(symtab_l, symtab_c):
+  def codegen(self, symtab_l, symtab_c, global_tracer):
     code = []
     # Case: subroutineCall
     if self.subroutine_call:
-      code += self.subroutine_call.codegen(symtab_l, symtab_c)
+      code += self.subroutine_call.codegen(symtab_l, symtab_c, global_tracer)
       return code
     # Case: varName[expression]
     if self.const_or_op and self.expression:
@@ -178,7 +186,7 @@ class Term(object):
       var_info = variable_lookup(self.const_or_op, symtab_l, symtab_c)
       # varName + codegen(expression) -> offset
       code += ["push {var_info[\"kind\"]} {var_info[\"index\"]}"]
-      code += self.espression.codegen(symtab_l, symtab_c)
+      code += self.expression.codegen(symtab_l, symtab_c, global_tracer)
       code += ["add"]
       # Set that pointer
       code += ["pop pointer 1"]
@@ -186,12 +194,12 @@ class Term(object):
     return code
     # Case: (expression)
     if self.expression and self.const_or_op is None:
-      code += self.expression.codegen(symtab_l, symtab_c)
+      code += self.expression.codegen(symtab_l, symtab_c, global_tracer)
       return code
     # Case: UnaryOp term
     if self.term and self.const_or_op:
       # 1. parse term
-      code += self.term.codegen(symtab_l, symtab_c)
+      code += self.term.codegen(symtab_l, symtab_c, global_tracer)
       # 2. parse unaryOp
       if self.const_or_op == "-":
         code += ["neg"]
@@ -258,16 +266,16 @@ class Expression(object):
     
     print("----- Expression End -----")
   
-  def codegen(self, symtab_l, symtab_c):
+  def codegen(self, symtab_l, symtab_c, global_tracer):
     code = []
     # push first term
-    code += self.terms[0].codegen(symtab_l, symtab_c)
+    code += self.terms[0].codegen(symtab_l, symtab_c, global_tracer)
     
     # from second term on,
     for i in range(1, len(self.terms)):
       # 1. push term
       term = self.terms[i]
-      code += term.codegen(symtab_l, symtab_c)
+      code += term.codegen(symtab_l, symtab_c, global_tracer)
       
       # 2. push op
       op = self.ops[i]

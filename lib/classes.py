@@ -1,6 +1,22 @@
 from lib.tokenizer import Terminator
 from lib.statements import Statements
 
+class GlobalTracer(object):
+  def __init__(self, compiled_types):
+    self.static_index = 0
+    self.label_index = 0
+    self.compiled_types = compiled_types
+  
+  def get_static_index(self):    
+    index = self.static_index
+    self.static_index += 1
+    return index
+    
+  def get_label(self):
+    label = f"Label_{self.label_index}"
+    self.label_index += 1
+    return label
+  
 class VarDec(object):
   @staticmethod
   def is_mytype(tokenizer):
@@ -45,9 +61,10 @@ class VarDec(object):
   def codegen(self, symtab_l):
     local_index = 0
     for name in self.names:
+      name = name.val
       symtab_l[name] = {}
       symtab_l[name]["kind"] = "local"
-      stmtab_l[name]["type"] = self.type
+      symtab_l[name]["type"] = self.type
       symtab_l[name]["index"] = local_index
       local_index += 1
     return symtab_l
@@ -91,10 +108,9 @@ class SubroutineBody(object):
 
   def codegen(self, symtab_l, symtab_c, global_tracer):
     code = []
-    label_tracer = global_tracer.label_tracer
     for var_dec in self.var_decs:
       symtab_l = var_dec.codegen(symtab_l)
-    code += self.statements.codegen(symtab_l, symtab_c, label_tracer)
+    code += self.statements.codegen(symtab_l, symtab_c, global_tracer)
     return code
 
 class ParameterList(object):
@@ -133,8 +149,15 @@ class ParameterList(object):
   def codegen(self):
     argument_index = 0
     symtab_l = {}
+    
     for param in self.params_list:
       dtype, name = param
+      name = name.val
+      # Check if type is known
+      class_types = global_tracer.compiled_types.class_types
+      plain_types = global_tracer.compiled_types.plain_types
+      assert dtype in class_types + plain_types
+    
       symtab_l[name] = {}
       symtab_l[name]["kind"] = "argument"
       symtab_l[name]["type"] = dtype
@@ -200,33 +223,31 @@ class SubroutineDec(object):
     
     print("------ SubroutineDec End ------")
   
-  def codegen(self, class_name, symbol_c, global_tracer):
+  def codegen(self, class_name, symtab_c, global_tracer):
     # Init local symtab
     # var_name : {"kind", "index"}
-    symtab_l = self.expression_list.code_gen()
+    symtab_l = self.params_list.codegen()
 
+    num_local_var = len(self.subroutine_body.var_decs)
+    code = [f"function {class_name}.{self.name} {num_local_var}"]
     if self.decorator == "constructor":
       # Number of local variables
-      num_local_var = len(self.subroutine_body.var_decs)
       num_arg_var   = len(symbol_c.keys())
       
       # Memory Alloc
-      code = [f"function {class_name}.{self.name} {num_local_var}"]
       code += [f"push {num_arg_var}", "call Memory.alloc 1", "pop pointer 0"]
-      code += self.subroutine_body.code_gen(symtab_l, symtab_c, global_tracer)
+      code += self.subroutine_body.codegen(symtab_l, symtab_c, global_tracer)
       
     elif self.decorator == "method":
-      num_local_var = len(self.subroutine_body.var_decs)
-      
-      code = [f"function {class_name}.{self.name} {num_local_var}"]
-      code += self.subroutine_body.code_gen(symtab_l, symtab_c, global_tracer)
+      # Set this to pointer 0
+      code += ["push argument 0", "pop pointer 0"]
+      code += self.subroutine_body.codegen(symtab_l, symtab_c, global_tracer)
     
     elif self.decorator == "function":
-      num_local_var = len(self.subroutine_body.var_decs)
-      
-      code = [f"function {self.name} {num_local_var}"]
-      code += self.subroutine_body.code_gen(symtab_l, symtab_c, global_tracer)
-    
+      code += self.subroutine_body.codegen(symtab_l, symtab_c, global_tracer)
+    else:
+      raise "Error"
+
     return code
     
 class ClassVarDec(object):
@@ -276,7 +297,12 @@ class ClassVarDec(object):
   def codegen(self, symtab_c, global_tracer, class_name):
     # Update symtab_c
     field_index = 0
+    class_types = global_tracer.compiled_types.class_types
+    plain_types = global_tracer.compiled_types.plain_types
+    assert self.type in class_types + plain_types
+
     for name in self.names:
+      name = name.val
       symtab_c[name] = {}
       if self.decorator == "static":
         static_index = global_tracer.get_static_index()
@@ -299,7 +325,8 @@ class Class(object):
     if tok == "class": return True
     return False
   
-  def __init__(self):
+  def __init__(self, compiled_types):
+    self.global_tracer = GlobalTracer(compiled_types)
     self.name = None
     self.classVarDec = []
     self.subroutineDec = []
@@ -341,9 +368,9 @@ class Class(object):
     code = []
     symtab_c = {}
     for classVarDec in self.classVarDec:
-      symtab_c = classVarDec.codegen(symtab_c, global_tracer, self.name)
+      symtab_c = classVarDec.codegen(symtab_c, self.global_tracer, self.name)
     
     for subroutineDec in self.subroutineDec:
-      code += subroutineDec.codegen(self.name, symtab_c, global_tracer)
+      code += subroutineDec.codegen(self.name, symtab_c, self.global_tracer)
     
     return code

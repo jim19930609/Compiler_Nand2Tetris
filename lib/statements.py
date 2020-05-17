@@ -51,26 +51,26 @@ class LetStatement(object):
     
     print("----- Let Statement End -----")
     
-  def codegen(self, symtab_l, symtab_c, label_tracer):
+  def codegen(self, symtab_l, symtab_c, global_tracer):
     code = []
     if self.expression_l:
       # let varName[expression_l] = expression_r
       # Handle Array
-      var_info = variable_lookup(self.varName, symtab_l, symtab_c)
+      var_info = variable_lookup(self.varname, symtab_l, symtab_c)
       code += ["push {var_info[\"kind\"]} {var_info[\"index\"]}"]
       code += self.espression_l.codegen(symtab_l, symtab_c)
       code += ["add"]
       code += ["pop pointer 1"]
       # Now that points to varName[expression_l]
-      code += self.expression_r.codegen(symtab_l, symtab_c)
+      code += self.expression_r.codegen(symtab_l, symtab_c, global_tracer)
       # set expression_r to that 0
       code += ["pop that 0"]
       
     else:
       # let varName = expression_r
-      code += self.expression_r.codegen(symtab_l, symtab_c)
+      code += self.expression_r.codegen(symtab_l, symtab_c, global_tracer)
       # set expression_r to varName
-      var_info = variable_lookup(self.varName, symtab_l, symtab_c)
+      var_info = variable_lookup(self.varname, symtab_l, symtab_c)
       code += ["pop {var_info[\"kind\"]} {var_info[\"index\"]}"]
       
     return code
@@ -125,19 +125,19 @@ class IfStatement(object):
     
     print("----- If Statement End -----")
       
-  def codegen(self, symtab_l, symtab_c, label_tracer):
-    label_1 = label_tracer.get_label()
-    label_2 = label_tracer.get_label()
-    label_3 = label_tracer.get_label()
+  def codegen(self, symtab_l, symtab_c, global_tracer):
+    label_1 = global_tracer.get_label()
+    label_2 = global_tracer.get_label()
+    label_3 = global_tracer.get_label()
     code = []
     code += [f"(Label {label_1})"]
-    code += self.expression.codegen(symtab_l, symtab_c)
+    code += self.expression.codegen(symtab_l, symtab_c, global_tracer)
     code += ["not"]
     code += [f"if-goto {label_2}"]
-    code += self.if_statements.codegen(symtab_l, symtab_c, label_tracer)
+    code += self.if_statements.codegen(symtab_l, symtab_c, global_tracer)
     code += [f"goto {label_3}"]
     code += [f"(Label {label_2})"]
-    code += self.else_statements.codegen(symtab_l, symtab_c, label_tracer)
+    code += self.else_statements.codegen(symtab_l, symtab_c, global_tracer)
     code += [f"(Label {label_3})"]
     
 
@@ -178,15 +178,15 @@ class WhileStatement(object):
     
     print("----- While Statement End -----")
  
-  def codegen(self, symtab_l, symtab_c, label_tracer):
-    label_1 = label_tracer.get_label()
-    label_2 = label_tracer.get_label()
+  def codegen(self, symtab_l, symtab_c, global_tracer):
+    label_1 = global_tracer.get_label()
+    label_2 = global_tracer.get_label()
     code = []
     code += [f"(Label {label_1})"]
-    code += self.expression.codegen(symtab_l, symtab_c)
+    code += self.expression.codegen(symtab_l, symtab_c, global_tracer)
     code += ["not"]
     code += [f"if-goto {label_2}"]
-    code += self.statements.codegen(symtab_l, symtab_c, label_tracer)
+    code += self.statements.codegen(symtab_l, symtab_c, global_tracer)
     code += [f"goto {label_1}"]
     code += [f"(Label {label_2})"]
      
@@ -212,8 +212,10 @@ class DoStatement(object):
     assert tokenizer.tok_advance() == ";"
     print("----- Do Statement End -----")
   
-  def codegen(self, symtab_l, symtab_c, label_tracer):
-    code = self.subroutine_call.codegen(symtab_l, symtab_c)
+  def codegen(self, symtab_l, symtab_c, global_tracer):
+    code = self.subroutine_call.codegen(symtab_l, symtab_c, global_tracer)
+    # void return: drop return value
+    code += ["pop temp 0"]
     return code
 
 class ReturnStatement(object):
@@ -241,8 +243,12 @@ class ReturnStatement(object):
     assert tokenizer.tok_advance() == ";"
     print("----- Return Statement End -----")
   
-  def codegen(self, symtab_l, symtab_c, label_tracer):
-    code = self.expression.codegen(symtab_l, symtab_c)
+  def codegen(self, symtab_l, symtab_c, global_tracer):
+    if self.expression:
+      code = self.expression.codegen(symtab_l, symtab_c, global_tracer)
+    else:
+      # void return
+      code = ["push constant 0"]
     code += ["return"]
     return code
 
@@ -291,8 +297,8 @@ class Statement(object):
       statement.parse(tokenizer)
       self.statement = statement
   
-  def codegen(self, symtab_l, symtab_c, label_tracer):
-    return self.statement.codegen(symtab_l, symtab_c, label_tracer)
+  def codegen(self, symtab_l, symtab_c, global_tracer):
+    return self.statement.codegen(symtab_l, symtab_c, global_tracer)
     
 class Statements(object):
   @staticmethod
@@ -311,8 +317,8 @@ class Statements(object):
       else:
         break
   
-  def codegen(self, symtab_l, symtab_c, label_tracer):
+  def codegen(self, symtab_l, symtab_c, global_tracer):
     code = []
     for statement in self.statements:
-      code += statement.codegen(symtab_l, symtab_c, label_tracer)
+      code += statement.codegen(symtab_l, symtab_c, global_tracer)
     return code
