@@ -3,7 +3,7 @@ from lib.classes import Class
 
 class AllTypes(object):
   plain_types = ["int", "char", "boolean"]
-  class_types = ["Math", "String", "Memory", "Keyboard", "Output"]
+  class_types = ["Array", "Math", "String", "Memory", "Keyboard", "Output"]
 
 class Parser(object):
   def __init__(self, filenames):
@@ -25,11 +25,17 @@ class Parser(object):
     return c
 
 if __name__ == "__main__":
-  parser = Parser(["/Users/zhanlueyang/Desktop/Compiler_Nand2Tetris/nand2tetris/projects/11/Average/Main.jack"])
+  #parser = Parser(["unit_tests/FunctionDec/Main.jack"])
+  parser = Parser(["unit_tests/ArrayInit/Main.jack"])
   parser.parse_program()
 
+  print("!!!!!!!!!!!!!!!!!!")
+  print("!!!!!!!!!!!!!!!!!!")
+  print("!!!!!!!!!!!!!!!!!!")
   class0 = parser.classes[0]
   code = class0.codegen()
 
+  # Call Main
+  code += ["call Main.main 0", "pop temp 0"]
   for c in code:
     print(c)

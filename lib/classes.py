@@ -58,8 +58,7 @@ class VarDec(object):
     
     print("----- VarDec End -----")  
       
-  def codegen(self, symtab_l):
-    local_index = 0
+  def codegen(self, symtab_l, local_index):
     self.names = [v.val for v in self.names]
     for name in self.names:
       symtab_l[name] = {}
@@ -67,7 +66,7 @@ class VarDec(object):
       symtab_l[name]["type"] = self.type
       symtab_l[name]["index"] = local_index
       local_index += 1
-    return symtab_l
+    return symtab_l, local_index
 
 class SubroutineBody(object):
   @staticmethod
@@ -105,11 +104,12 @@ class SubroutineBody(object):
     assert symbol_r == "}"
     print(symbol_r)
     print("------ SubroutineBody End ------")
-
+    
   def codegen(self, symtab_l, symtab_c, global_tracer):
     code = []
+    local_index = 0
     for var_dec in self.var_decs:
-      symtab_l = var_dec.codegen(symtab_l)
+      symtab_l, local_index = var_dec.codegen(symtab_l, local_index)
     code += self.statements.codegen(symtab_l, symtab_c, global_tracer)
     return code
 
@@ -300,9 +300,8 @@ class ClassVarDec(object):
 
     print("------ ClassVarDec End ------")
   
-  def codegen(self, symtab_c, global_tracer, class_name):
+  def codegen(self, symtab_c, global_tracer, class_name, field_index):
     # Update symtab_c
-    field_index = 0
     class_types = global_tracer.compiled_types.class_types
     plain_types = global_tracer.compiled_types.plain_types
     assert self.type in class_types + plain_types
@@ -322,7 +321,7 @@ class ClassVarDec(object):
         field_index += 1
       else:
         raise "Unrecognized decorator during code gen for classVarDec"
-      return symtab_c
+      return symtab_c, field_index
 
 class Class(object):
   @staticmethod
@@ -374,8 +373,9 @@ class Class(object):
     code = []
     symtab_c = {}
     self.name = self.name.val
+    field_index = 0
     for classVarDec in self.classVarDec:
-      symtab_c = classVarDec.codegen(symtab_c, self.global_tracer, self.name)
+      symtab_c, field_index = classVarDec.codegen(symtab_c, self.global_tracer, self.name, field_index)
     
     for subroutineDec in self.subroutineDec:
       code += subroutineDec.codegen(self.name, symtab_c, self.global_tracer)

@@ -34,6 +34,7 @@ class ExpressionList(object):
     # Already handled by expression.codegen()
     code = []
     for expression in self.expressions:
+      
       code += expression.codegen(symtab_l, symtab_c, global_tracer)
     
     return code
@@ -64,7 +65,7 @@ class SubroutineCall(object):
       assert ExpressionList.is_mytype(tokenizer)
       expression_list = ExpressionList()
       expression_list.parse(tokenizer)
-      self.expression_list_l = expression_list
+      self.expression_list = expression_list
       assert tokenizer.tok_advance() == ")"
     elif tokenizer.tok_ahead() == ".":
       print("[Parsing ExpressionList case 1]")
@@ -79,8 +80,10 @@ class SubroutineCall(object):
       assert ExpressionList.is_mytype(tokenizer)
       expression_list = ExpressionList()
       expression_list.parse(tokenizer)
-      self.expression_list_l = expression_list
+      self.expression_list = expression_list
       assert tokenizer.tok_advance() == ")"
+    else:
+      assert False
     print("----- Subroutine Call End -----")
 
   def codegen(self, symtab_l, symtab_c, global_tracer):
@@ -93,7 +96,6 @@ class SubroutineCall(object):
     if self.class_or_var_name:
       # Case: className|varName.subroutineName(expressionlist)
       self.class_or_var_name = self.class_or_var_name.val
-
       # push class instance pointer as first argument
       class_types = global_tracer.compiled_types.class_types
       if self.class_or_var_name in class_types:
@@ -153,8 +155,8 @@ class Term(object):
     if type(tok) is Terminator and tok.type in ["integerConstant", "stringConstant"]:
       self.const_or_op = tokenizer.tok_advance()
     elif type(tok) is Terminator and tok.type == "identifier":
-      self.const_or_op = tokenizer.tok_advance()
-      if tokenizer.tok_ahead() == "[":
+      if tokenizer.tok_ahead_next() == "[":
+        self.const_or_op = tokenizer.tok_advance()
         print("[Parsing Expression]")
         assert tokenizer.tok_advance() == "["
         assert Expression.is_mytype(tokenizer)
@@ -162,13 +164,15 @@ class Term(object):
         expression.parse(tokenizer)
         self.expression = expression
         assert tokenizer.tok_advance() == "]"
-      if tokenizer.tok_ahead() in ["(", "."]:
+      elif tokenizer.tok_ahead_next() in ["(", "."]:
         print("[Parsing Subroutine Call]")
-        assert tokenizer.tok_advance() in ["(", "."]
         assert SubroutineCall.is_mytype(tokenizer)
         subroutine_call = SubroutineCall()
         subroutine_call.parse(tokenizer)
         self.subroutine_call = subroutine_call
+      else:
+        print("[Parsing VarName]")
+        self.const_or_op = tokenizer.tok_advance()
       
     elif tok in KeywordConstants:
       self.const_or_op = tokenizer.tok_advance()
@@ -196,7 +200,7 @@ class Term(object):
       code += self.subroutine_call.codegen(symtab_l, symtab_c, global_tracer)
       return code
     # Case: varName[expression]
-    if self.const_or_op and self.expression:
+    elif self.const_or_op and self.expression:
       self.const_or_op = self.const_or_op.val
       # Parse Array Indexing
       var_info = variable_lookup(self.const_or_op, symtab_l, symtab_c)
@@ -209,13 +213,14 @@ class Term(object):
       # Set that pointer
       code += ["pop pointer 1"]
       code += ["push that 0"]
-    return code
+      return code
     # Case: (expression)
-    if self.expression and self.const_or_op is None:
+    elif self.expression and self.const_or_op is None:
       code += self.expression.codegen(symtab_l, symtab_c, global_tracer)
       return code
     # Case: UnaryOp term
-    if self.term and self.const_or_op:
+    elif self.term and self.const_or_op:
+      self.const_or_op = self.const_or_op.val
       # 1. parse term
       code += self.term.codegen(symtab_l, symtab_c, global_tracer)
       # 2. parse unaryOp
@@ -227,8 +232,9 @@ class Term(object):
         raise "Unrecognized unaryOp during code gen for term"
       return code
     # Case: integerConstant, stringConstant, keywordConstant, varName
-    if self.const_or_op and self.term is None and self.expression is None and self.term is None:
+    elif self.const_or_op and self.term is None and self.expression is None and self.term is None:
       if type(self.const_or_op) is Terminator and self.const_or_op.type == "identifier":
+        self.const_or_op = self.const_or_op.val
         # Case: varName
         var_info = variable_lookup(self.const_or_op, symtab_l, symtab_c)
         kind = var_info["kind"]
@@ -251,10 +257,13 @@ class Term(object):
         elif self.const_or_op == "this":
           code += ["push this 0"]
         else:
+          self.const_or_op = self.const_or_op.val
           # Int/Str Constants
-          code += [f"push {self.const_or_op}"]
+          code += [f"push constant {self.const_or_op}"]
         return code
-
+    else:
+      assert False
+      
 class Expression(object):
   @staticmethod
   def is_mytype(tokenizer):

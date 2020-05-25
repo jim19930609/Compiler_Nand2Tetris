@@ -62,7 +62,7 @@ class LetStatement(object):
       index = var_info["index"]
       
       code += [f"push {kind} {index}"]
-      code += self.espression_l.codegen(symtab_l, symtab_c)
+      code += self.expression_l.codegen(symtab_l, symtab_c, global_tracer)
       code += ["add"]
       code += ["pop pointer 1"]
       # Now that points to varName[expression_l]
@@ -286,23 +286,25 @@ class Statement(object):
       statement = LetStatement()
       statement.parse(tokenizer)
       self.statement = statement
-    if IfStatement.is_mytype(tokenizer):
+    elif IfStatement.is_mytype(tokenizer):
       statement = IfStatement()
       statement.parse(tokenizer)
       self.statement = statement
-    if WhileStatement.is_mytype(tokenizer):
+    elif WhileStatement.is_mytype(tokenizer):
       statement = WhileStatement()
       statement.parse(tokenizer)
       self.statement = statement
-    if DoStatement.is_mytype(tokenizer):
+    elif DoStatement.is_mytype(tokenizer):
       statement = DoStatement()
       statement.parse(tokenizer)
       self.statement = statement
-    if ReturnStatement.is_mytype(tokenizer):
+    elif ReturnStatement.is_mytype(tokenizer):
       statement = ReturnStatement()
       statement.parse(tokenizer)
       self.statement = statement
-  
+    else:
+      assert False
+
   def codegen(self, symtab_l, symtab_c, global_tracer):
     return self.statement.codegen(symtab_l, symtab_c, global_tracer)
     
