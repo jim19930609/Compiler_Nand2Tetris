@@ -34,19 +34,45 @@ if __name__ == "__main__":
   #root = "unit_tests/Seven/"
   #root = "unit_tests/ConvertToBin/"
   #root = "unit_tests/ComplexArrays_test/"
-  root = "unit_tests/Pong/"
   
+  # Square Game
+  root = "nand2tetris/projects/11/Square/"  
+  main_file = f"{root}/Main.jack"
+  square_file = f"{root}/Square.jack"
+  game_file = f"{root}/SquareGame.jack"
+
+  parser = Parser([square_file, game_file, main_file])
+  parser.parse_program()
+  
+  print(f"Parsing File: Square")
+  square_code = parser.classes[0].codegen()
+  print(f"Parsing File: SquareGame")
+  game_code = parser.classes[1].codegen()
+  print(f"Parsing File: Main")
+  main_code = parser.classes[2].codegen()
+  
+  os.system("rm -f tests/*")
+  with open("tests/Square.vm", "a") as f:
+    for code in square_code:
+      f.write(code + "\n") 
+  with open("tests/SquareGame.vm", "a") as f:
+    for code in game_code:
+      f.write(code + "\n") 
+  with open("tests/Main.vm", "a") as f:
+    for code in main_code:
+      f.write(code + "\n") 
+  
+  # Pong Game
+  '''
+  root = "unit_tests/Pong/"
   main_file = f"{root}/Main.jack"
   ball_file = f"{root}/Ball.jack"
   bat_file = f"{root}/Bat.jack"
   game_file = f"{root}/PongGame.jack"
   
-
-  parser = Parser([ball_file, bat_file, game_file, main_file])
+  parser = Parser([square_file, game_file, main_file])
   parser.parse_program()
-  print("!!!!!!!!!!!!!!!!!!")
-  print("!!!!!!!!!!!!!!!!!!")
-  print("!!!!!!!!!!!!!!!!!!")
+  
   print(f"Parsing File: Ball")
   ball_code = parser.classes[0].codegen()
   print(f"Parsing File: Bat")
@@ -70,3 +96,4 @@ if __name__ == "__main__":
   with open("tests/Main.vm", "a") as f:
     for code in main_code:
       f.write(code + "\n") 
+  '''

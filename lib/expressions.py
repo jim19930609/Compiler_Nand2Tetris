@@ -122,12 +122,15 @@ class SubroutineCall(object):
       
       code += [f"call {type_of_class}.{self.subroutine_name} {num_arguments}"]
     else:
+      code += [f"push pointer 0"]
+      num_arguments += 1
       # Case: subroutineName(expressionlist): function
       if self.expression_list:
         code += self.expression_list.codegen(symtab_l, symtab_c, global_tracer)
         num_arguments += len(self.expression_list.expressions)
-      
-      code += [f"call {self.subroutine_name} {num_arguments}"]
+      curr_class_name = global_tracer.curr_class_name
+      assert curr_class_name is not None
+      code += [f"call {curr_class_name}.{self.subroutine_name} {num_arguments}"]
     
     return code
 

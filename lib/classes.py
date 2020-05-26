@@ -6,6 +6,7 @@ class GlobalTracer(object):
     self.static_index = 0
     self.label_index = 0
     self.compiled_types = compiled_types
+    self.curr_class_name = None
   
   def get_static_index(self):    
     index = self.static_index
@@ -146,8 +147,10 @@ class ParameterList(object):
       print("[Parsing Parameter End]")
     print("------ ParameterList End ------")
 
-  def codegen(self, global_tracer):
+  def codegen(self, global_tracer, is_method):
     argument_index = 0
+    if is_method:
+      argument_index = 1
     symtab_l = {}
     
     # [[type, name], ...]
@@ -231,7 +234,6 @@ class SubroutineDec(object):
   def codegen(self, class_name, symtab_c, global_tracer):
     # Init local symtab
     # var_name : {"kind", "index"}
-    symtab_l = self.params_list.codegen(global_tracer)
     
     self.name = self.name.val
     num_local_var = 0
@@ -240,19 +242,22 @@ class SubroutineDec(object):
 
     code = [f"function {class_name}.{self.name} {num_local_var}"]
     if self.decorator == "constructor":
+      symtab_l = self.params_list.codegen(global_tracer, is_method=False)
       # Number of local variables
-      num_arg_var   = len(symtab_c.keys())
+      num_arg_var   = len([v for v in symtab_c.keys() if symtab_c[v]["kind"] != "static"])
       
       # Memory Alloc
       code += [f"push constant {num_arg_var}", "call Memory.alloc 1", "pop pointer 0"]
       code += self.subroutine_body.codegen(symtab_l, symtab_c, global_tracer)
       
     elif self.decorator == "method":
+      symtab_l = self.params_list.codegen(global_tracer, is_method=True)
       # Set this to pointer 0
       code += ["push argument 0", "pop pointer 0"]
       code += self.subroutine_body.codegen(symtab_l, symtab_c, global_tracer)
     
     elif self.decorator == "function":
+      symtab_l = self.params_list.codegen(global_tracer, is_method=False)
       code += self.subroutine_body.codegen(symtab_l, symtab_c, global_tracer)
     else:
       raise "Error"
@@ -376,6 +381,8 @@ class Class(object):
     code = []
     symtab_c = {}
     self.name = self.name.val
+    self.global_tracer.curr_class_name = self.name
+    
     field_index = 0
     for classVarDec in self.classVarDec:
       symtab_c, field_index = classVarDec.codegen(symtab_c, self.global_tracer, self.name, field_index)
