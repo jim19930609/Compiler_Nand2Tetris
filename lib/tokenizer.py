@@ -188,6 +188,7 @@ class Tokenizer(object):
     return False
   
   def load_file(self, filename):
+    self.cursor = 0
     with open(filename, "r") as f:
       self.content = f.read()
     

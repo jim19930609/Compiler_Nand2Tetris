@@ -146,15 +146,18 @@ class ParameterList(object):
       print("[Parsing Parameter End]")
     print("------ ParameterList End ------")
 
-  def codegen(self):
+  def codegen(self, global_tracer):
     argument_index = 0
     symtab_l = {}
     
     # [[type, name], ...]
-    self.params_list = [[l[0], l[1].val] for v in self.params_list]
+    self.params_list = [[v[0], v[1].val] for v in self.params_list]
     for param in self.params_list:
       dtype, name = param
-      name = name.val
+      if type(name) is Terminator:
+        name = name.val
+      if type(dtype) is Terminator:
+        dtype = dtype.val
       # Check if type is known
       class_types = global_tracer.compiled_types.class_types
       plain_types = global_tracer.compiled_types.plain_types
@@ -228,7 +231,7 @@ class SubroutineDec(object):
   def codegen(self, class_name, symtab_c, global_tracer):
     # Init local symtab
     # var_name : {"kind", "index"}
-    symtab_l = self.params_list.codegen()
+    symtab_l = self.params_list.codegen(global_tracer)
     
     self.name = self.name.val
     num_local_var = 0
@@ -238,10 +241,10 @@ class SubroutineDec(object):
     code = [f"function {class_name}.{self.name} {num_local_var}"]
     if self.decorator == "constructor":
       # Number of local variables
-      num_arg_var   = len(symbol_c.keys())
+      num_arg_var   = len(symtab_c.keys())
       
       # Memory Alloc
-      code += [f"push {num_arg_var}", "call Memory.alloc 1", "pop pointer 0"]
+      code += [f"push constant {num_arg_var}", "call Memory.alloc 1", "pop pointer 0"]
       code += self.subroutine_body.codegen(symtab_l, symtab_c, global_tracer)
       
     elif self.decorator == "method":
@@ -290,7 +293,6 @@ class ClassVarDec(object):
       symbol = tokenizer.tok_advance()
       if symbol == ";":
         break
-
       assert symbol == ","
       name = tokenizer.tok_advance()
       assert type(name) is Terminator
@@ -304,8 +306,9 @@ class ClassVarDec(object):
     # Update symtab_c
     class_types = global_tracer.compiled_types.class_types
     plain_types = global_tracer.compiled_types.plain_types
+    if type(self.type) is Terminator:
+      self.type = self.type.val
     assert self.type in class_types + plain_types
-    
     self.names = [v.val for v in self.names]
     for name in self.names:
       symtab_c[name] = {}
@@ -316,12 +319,12 @@ class ClassVarDec(object):
         symtab_c[name]["index"] = static_index
       elif self.decorator == "field":
         symtab_c[name]["kind"] = "this"
-        symtab_c[name]["type"] = "class_name"
+        symtab_c[name]["type"] = self.type
         symtab_c[name]["index"] = field_index
         field_index += 1
       else:
         raise "Unrecognized decorator during code gen for classVarDec"
-      return symtab_c, field_index
+    return symtab_c, field_index
 
 class Class(object):
   @staticmethod

@@ -98,25 +98,29 @@ class SubroutineCall(object):
       self.class_or_var_name = self.class_or_var_name.val
       # push class instance pointer as first argument
       class_types = global_tracer.compiled_types.class_types
+      type_of_class = None
       if self.class_or_var_name in class_types:
         # function/constructor subroutine
         # No need to push object reference
+        type_of_class = self.class_or_var_name
         pass
       else:
         # method subroutine
         var_info = variable_lookup(self.class_or_var_name, symtab_l, symtab_c)
         kind = var_info["kind"]
         index = var_info["index"]
+        type_of_class = var_info["type"]
 
         code += [f"push {kind} {index}"]
         num_arguments += 1
-    
+      if type(type_of_class) is Terminator:
+        type_of_class = type_of_class.val
       # push arguments and then call function
       if self.expression_list:
         code += self.expression_list.codegen(symtab_l, symtab_c, global_tracer)
         num_arguments += len(self.expression_list.expressions)
       
-      code += [f"call {self.class_or_var_name}.{self.subroutine_name} {num_arguments}"]
+      code += [f"call {type_of_class}.{self.subroutine_name} {num_arguments}"]
     else:
       # Case: subroutineName(expressionlist): function
       if self.expression_list:
@@ -220,7 +224,8 @@ class Term(object):
       return code
     # Case: UnaryOp term
     elif self.term and self.const_or_op:
-      self.const_or_op = self.const_or_op.val
+      if type(self.const_or_op) is Terminator:
+        self.const_or_op = self.const_or_op.val
       # 1. parse term
       code += self.term.codegen(symtab_l, symtab_c, global_tracer)
       # 2. parse unaryOp
@@ -246,20 +251,31 @@ class Term(object):
         # Case: Constants
         if self.const_or_op == "true":
           # map to -1
-          code += ["push 1"]
+          code += ["push constant 1"]
           code += ["neg"]
         elif self.const_or_op == "false":
           # map to 0
-          code += ["push 0"]
+          code += ["push constant 0"]
         elif self.const_or_op == "null":
           # map to 0
-          code += ["push 0"]
+          code += ["push constant 0"]
         elif self.const_or_op == "this":
-          code += ["push this 0"]
+          code += ["push pointer 0"]
         else:
-          self.const_or_op = self.const_or_op.val
           # Int/Str Constants
-          code += [f"push constant {self.const_or_op}"]
+          if self.const_or_op.type == "stringConstant":
+            self.const_or_op = self.const_or_op.val
+            # length of string
+            code += [f"push constant {len(self.const_or_op)}"]
+            code += [f"call String.new 1"]
+            for c in self.const_or_op:
+              # push ascii value
+              code += [f"push constant {ord(c)}"]
+              code += [f"call String.appendChar 2"]
+          else:
+            self.const_or_op = self.const_or_op.val
+            code += [f"push constant {self.const_or_op}"]
+          
         return code
     else:
       assert False
@@ -308,15 +324,15 @@ class Expression(object):
       code += term.codegen(symtab_l, symtab_c, global_tracer)
       
       # 2. push op
-      op = self.ops[i]
+      op = self.ops[i-1]
       if op == "+":
         code += ["add"]
       elif op == "-":
         code += ["sub"]
       elif op == "*":
-        code += ["mul"]
+        code += ["call Math.multiply 2"]
       elif op == "/":
-        code += ["div"]
+        code += ["call Math.divide 2"]
       elif op == "&":
         code += ["and"]
       elif op == "|":

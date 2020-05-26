@@ -134,18 +134,20 @@ class IfStatement(object):
   def codegen(self, symtab_l, symtab_c, global_tracer):
     label_1 = global_tracer.get_label()
     label_2 = global_tracer.get_label()
-    label_3 = global_tracer.get_label()
     code = []
-    code += [f"(Label {label_1})"]
     code += self.expression.codegen(symtab_l, symtab_c, global_tracer)
     code += ["not"]
-    code += [f"if-goto {label_2}"]
-    code += self.if_statements.codegen(symtab_l, symtab_c, global_tracer)
-    code += [f"goto {label_3}"]
-    code += [f"(Label {label_2})"]
-    code += self.else_statements.codegen(symtab_l, symtab_c, global_tracer)
-    code += [f"(Label {label_3})"]
+    code += [f"if-goto {label_1}"]
     
+    code += self.if_statements.codegen(symtab_l, symtab_c, global_tracer)
+    code += [f"goto {label_2}"]
+    
+    code += [f"label {label_1}"]
+    if self.else_statements:
+      code += self.else_statements.codegen(symtab_l, symtab_c, global_tracer)
+    
+    code += [f"label {label_2}"]
+    return code
 
 
 class WhileStatement(object):
@@ -174,12 +176,12 @@ class WhileStatement(object):
     self.expression = expression
     assert tokenizer.tok_advance() == ")"
 
-    # Parse If Statements
+    # Parse Statements
     print("[Parsing Second Expression]")
     assert tokenizer.tok_advance() == "{"
     statements = Statements()
     statements.parse(tokenizer)
-    self.if_statements = statements
+    self.statements = statements
     assert tokenizer.tok_advance() == "}"
     
     print("----- While Statement End -----")
@@ -188,13 +190,14 @@ class WhileStatement(object):
     label_1 = global_tracer.get_label()
     label_2 = global_tracer.get_label()
     code = []
-    code += [f"(Label {label_1})"]
+    code += [f"label {label_1}"]
     code += self.expression.codegen(symtab_l, symtab_c, global_tracer)
     code += ["not"]
     code += [f"if-goto {label_2}"]
     code += self.statements.codegen(symtab_l, symtab_c, global_tracer)
     code += [f"goto {label_1}"]
-    code += [f"(Label {label_2})"]
+    code += [f"label {label_2}"]
+    return code
      
 class DoStatement(object):
   @staticmethod
